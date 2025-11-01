@@ -99,10 +99,9 @@ router.post('/join', verifyToken, async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Room is full' });
     }
 
-    // Add player
+    // Add player (socketId will be set when connecting via WebSocket)
     room.players.push({
       userId,
-      socketId: '', // Will be set when connecting via WebSocket
       username,
       isReady: false
     });

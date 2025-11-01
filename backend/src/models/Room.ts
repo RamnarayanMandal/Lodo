@@ -5,7 +5,7 @@ export interface IRoom extends Document {
   hostId: string;
   players: Array<{
     userId: string;
-    socketId: string;
+    socketId?: string;
     username: string;
     color?: string;
     isReady: boolean;
@@ -22,7 +22,7 @@ const RoomSchema = new Schema<IRoom>({
   hostId: { type: String, required: true },
   players: [{
     userId: { type: String, required: true },
-    socketId: { type: String, required: true },
+    socketId: { type: String, default: '' },
     username: { type: String, required: true },
     color: { type: String },
     isReady: { type: Boolean, default: false }
