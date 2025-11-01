@@ -57,6 +57,14 @@ export function setupSocketIO(io: Server) {
         if (player) {
           player.socketId = socket.id;
           await room.save();
+          
+          // Notify other players that a player connected
+          io.to(roomCode).emit('player-connected', {
+            userId,
+            username,
+            room,
+            message: `${username} joined the room`
+          });
         }
 
         socket.join(roomCode);
@@ -102,10 +110,14 @@ export function setupSocketIO(io: Server) {
 
           io.to(roomCode).emit('player-ready-updated', { room });
 
-          // Check if all players are ready
-          const allReady = room.players.length >= 2 && room.players.every(p => p.isReady);
+          // Check if all players are ready and at least 2 players connected
+          const connectedPlayers = room.players.filter(p => p.socketId && p.socketId !== '');
+          const allReady = connectedPlayers.length >= 2 && 
+                          connectedPlayers.length === room.players.length &&
+                          connectedPlayers.every(p => p.isReady);
+          
           if (allReady && room.status === 'waiting') {
-            // Start game
+            // Start game when at least 2 players are ready and connected
             await startGame(roomCode);
           }
         }
@@ -314,9 +326,18 @@ export function setupSocketIO(io: Server) {
         const player = room.players.find(p => p.socketId === socket.id);
         if (player) {
           player.socketId = '';
+          await room.save();
+          
+          // Notify other players that a player disconnected
+          io.to(room.code).emit('player-disconnected', {
+            userId,
+            username,
+            room,
+            message: `${username} left the room`
+          });
+          
+          io.to(room.code).emit('room-updated', { room });
         }
-        await room.save();
-        io.to(room.code).emit('player-disconnected', { userId, room });
       }
     });
   });
@@ -325,7 +346,11 @@ export function setupSocketIO(io: Server) {
 async function startGame(roomCode: string) {
   try {
     const room = await Room.findOne({ code: roomCode.toUpperCase() });
-    if (!room || room.players.length < 2) return;
+    // Game starts when at least 2 players are ready
+    if (!room || room.players.length < 2) {
+      console.log(`Cannot start game: room has ${room?.players.length || 0} players, need at least 2`);
+      return;
+    }
 
     // Assign colors
     const colors = [PlayerColor.RED, PlayerColor.BLUE, PlayerColor.GREEN, PlayerColor.YELLOW];
