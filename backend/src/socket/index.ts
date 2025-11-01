@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { Room } from '../models/Room';
 import { Game } from '../models/Game';
 import { PlayerColor } from '../types/game';
+import { RTCSessionDescriptionInit, RTCIceCandidateInit } from '../types/webrtc';
 import { 
   initializePieces, 
   rollDice
