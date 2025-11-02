@@ -14,11 +14,28 @@ interface GameBoardProps {
 const CELL_SIZE = 38; // px
 const BOARD_SIZE = CELL_SIZE * 15; // 15x15 grid
 
-const playerColors: Record<PlayerColor, string> = {
-  [PlayerColor.RED]: '#E53935',
-  [PlayerColor.GREEN]: '#4CAF50',
-  [PlayerColor.BLUE]: '#2196F3',
-  [PlayerColor.YELLOW]: '#FFC107',
+// Realistic color gradients for 3D effect
+const playerColors: Record<PlayerColor, { main: string; light: string; dark: string }> = {
+  [PlayerColor.RED]: {
+    main: '#E53935',
+    light: '#EF5350',
+    dark: '#C62828',
+  },
+  [PlayerColor.GREEN]: {
+    main: '#4CAF50',
+    light: '#66BB6A',
+    dark: '#388E3C',
+  },
+  [PlayerColor.BLUE]: {
+    main: '#2196F3',
+    light: '#42A5F5',
+    dark: '#1976D2',
+  },
+  [PlayerColor.YELLOW]: {
+    main: '#FFC107',
+    light: '#FFCA28',
+    dark: '#F9A825',
+  },
 };
 
 // Safe zone positions (where stars appear)
@@ -111,104 +128,139 @@ export function GameBoard({ gameState, selectedPiece, onPieceClick, currentPlaye
           grid-template-rows: repeat(6, ${CELL_SIZE}px) repeat(3, ${CELL_SIZE}px) repeat(6, ${CELL_SIZE}px);
           width: ${BOARD_SIZE}px;
           height: ${BOARD_SIZE}px;
-          border: 3px solid #333;
-          border-radius: 10px;
+          border: 4px solid #1a1a1a;
+          border-radius: 12px;
           overflow: hidden;
-          box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+          box-shadow: 
+            0 8px 20px rgba(0, 0, 0, 0.4),
+            inset 0 1px 0 rgba(255, 255, 255, 0.1);
           position: relative;
-          background: #f5f5f5;
+          background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%);
         }
 
         .house {
           display: flex;
           justify-content: center;
           align-items: center;
-          border: 1px solid #777;
+          border: 2px solid #444;
+          box-shadow: 
+            inset 0 2px 4px rgba(0, 0, 0, 0.3),
+            inset 0 -2px 4px rgba(255, 255, 255, 0.2);
         }
 
         .house.red {
           grid-area: 1 / 1 / 7 / 7;
-          background-color: ${playerColors[PlayerColor.RED]};
+          background: linear-gradient(135deg, ${playerColors[PlayerColor.RED].light} 0%, ${playerColors[PlayerColor.RED].main} 50%, ${playerColors[PlayerColor.RED].dark} 100%);
         }
 
         .house.green {
           grid-area: 1 / 10 / 7 / 16;
-          background-color: ${playerColors[PlayerColor.GREEN]};
+          background: linear-gradient(135deg, ${playerColors[PlayerColor.GREEN].light} 0%, ${playerColors[PlayerColor.GREEN].main} 50%, ${playerColors[PlayerColor.GREEN].dark} 100%);
         }
 
         .house.blue {
           grid-area: 10 / 1 / 16 / 7;
-          background-color: ${playerColors[PlayerColor.BLUE]};
+          background: linear-gradient(135deg, ${playerColors[PlayerColor.BLUE].light} 0%, ${playerColors[PlayerColor.BLUE].main} 50%, ${playerColors[PlayerColor.BLUE].dark} 100%);
         }
 
         .house.yellow {
           grid-area: 10 / 10 / 16 / 16;
-          background-color: ${playerColors[PlayerColor.YELLOW]};
+          background: linear-gradient(135deg, ${playerColors[PlayerColor.YELLOW].light} 0%, ${playerColors[PlayerColor.YELLOW].main} 50%, ${playerColors[PlayerColor.YELLOW].dark} 100%);
         }
 
         .token-base {
           width: 70%;
           height: 70%;
-          background-color: #ececec;
-          border-radius: 5px;
-          border: 2px solid #555;
+          background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 50%, #d4d4d4 100%);
+          border-radius: 8px;
+          border: 3px solid #555;
           display: grid;
           grid-template-columns: 1fr 1fr;
           grid-template-rows: 1fr 1fr;
           place-items: center;
-          padding: 5px;
-          box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.3);
+          padding: 8px;
+          box-shadow: 
+            inset 0 2px 6px rgba(0, 0, 0, 0.4),
+            inset 0 -2px 3px rgba(255, 255, 255, 0.3),
+            0 2px 4px rgba(0, 0, 0, 0.2);
         }
 
         .token {
-          width: 25px;
-          height: 25px;
-          background-color: #e0e0e0;
+          width: 28px;
+          height: 28px;
           border-radius: 50%;
-          border: 2px solid #555;
+          border: 2.5px solid #444;
           position: relative;
-          box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4);
           cursor: pointer;
-          transition: transform 0.2s ease;
+          transition: all 0.2s ease;
+          box-shadow: 
+            0 3px 8px rgba(0, 0, 0, 0.5),
+            inset 0 -2px 4px rgba(0, 0, 0, 0.3),
+            inset 0 2px 3px rgba(255, 255, 255, 0.4);
+        }
+
+        .token.red-token {
+          background: radial-gradient(circle at 30% 30%, #ff6b6b 0%, ${playerColors[PlayerColor.RED].main} 40%, ${playerColors[PlayerColor.RED].dark} 100%);
+        }
+
+        .token.green-token {
+          background: radial-gradient(circle at 30% 30%, #81c784 0%, ${playerColors[PlayerColor.GREEN].main} 40%, ${playerColors[PlayerColor.GREEN].dark} 100%);
+        }
+
+        .token.blue-token {
+          background: radial-gradient(circle at 30% 30%, #64b5f6 0%, ${playerColors[PlayerColor.BLUE].main} 40%, ${playerColors[PlayerColor.BLUE].dark} 100%);
+        }
+
+        .token.yellow-token {
+          background: radial-gradient(circle at 30% 30%, #ffd54f 0%, ${playerColors[PlayerColor.YELLOW].main} 40%, ${playerColors[PlayerColor.YELLOW].dark} 100%);
         }
 
         .token:hover {
-          transform: scale(1.15);
+          transform: scale(1.2) translateY(-2px);
+          box-shadow: 
+            0 5px 12px rgba(0, 0, 0, 0.6),
+            inset 0 -2px 4px rgba(0, 0, 0, 0.3),
+            inset 0 2px 3px rgba(255, 255, 255, 0.4);
         }
 
         .token.selected {
           border-color: #ffd700;
           border-width: 3px;
-          box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+          box-shadow: 
+            0 0 15px rgba(255, 215, 0, 0.8),
+            0 3px 8px rgba(0, 0, 0, 0.5),
+            inset 0 -2px 4px rgba(0, 0, 0, 0.3),
+            inset 0 2px 3px rgba(255, 255, 255, 0.4);
+          transform: scale(1.15);
         }
 
         .token::before {
           content: '';
           position: absolute;
-          width: 10px;
-          height: 10px;
-          background-color: white;
+          width: 12px;
+          height: 12px;
+          background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.6) 60%, rgba(255, 255, 255, 0.3) 100%);
           border-radius: 50%;
-          border: 1px solid #555;
-          top: 50%;
-          left: 50%;
-          transform: translate(-50%, -50%);
+          border: 1.5px solid rgba(0, 0, 0, 0.3);
+          top: 25%;
+          left: 25%;
+          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
         }
 
         .token.red-token::before {
-          border-color: ${playerColors[PlayerColor.RED]};
+          border-color: ${playerColors[PlayerColor.RED].dark};
         }
 
         .token.green-token::before {
-          border-color: ${playerColors[PlayerColor.GREEN]};
+          border-color: ${playerColors[PlayerColor.GREEN].dark};
         }
 
         .token.blue-token::before {
-          border-color: ${playerColors[PlayerColor.BLUE]};
+          border-color: ${playerColors[PlayerColor.BLUE].dark};
         }
 
         .token.yellow-token::before {
-          border-color: ${playerColors[PlayerColor.YELLOW]};
+          border-color: ${playerColors[PlayerColor.YELLOW].dark};
         }
 
         .center-home {
@@ -216,32 +268,44 @@ export function GameBoard({ gameState, selectedPiece, onPieceClick, currentPlaye
           display: grid;
           grid-template-columns: 1fr 1fr;
           grid-template-rows: 1fr 1fr;
-          background: white;
-          border: 2px solid #333;
+          background: linear-gradient(135deg, #ffffff 0%, #f0f0f0 100%);
+          border: 3px solid #333;
+          box-shadow: 
+            inset 0 2px 4px rgba(0, 0, 0, 0.2),
+            inset 0 -2px 4px rgba(255, 255, 255, 0.3);
         }
 
         .center-triangle {
           clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+          transition: transform 0.2s ease;
+        }
+
+        .center-triangle:hover {
+          transform: scale(1.05);
         }
 
         .center-triangle.red-bg {
-          background-color: ${playerColors[PlayerColor.RED]};
+          background: linear-gradient(135deg, ${playerColors[PlayerColor.RED].light} 0%, ${playerColors[PlayerColor.RED].main} 50%, ${playerColors[PlayerColor.RED].dark} 100%);
           transform: rotate(270deg);
+          box-shadow: inset 0 -2px 4px rgba(0, 0, 0, 0.3);
         }
 
         .center-triangle.green-bg {
-          background-color: ${playerColors[PlayerColor.GREEN]};
+          background: linear-gradient(135deg, ${playerColors[PlayerColor.GREEN].light} 0%, ${playerColors[PlayerColor.GREEN].main} 50%, ${playerColors[PlayerColor.GREEN].dark} 100%);
           transform: rotate(0deg);
+          box-shadow: inset 0 -2px 4px rgba(0, 0, 0, 0.3);
         }
 
         .center-triangle.blue-bg {
-          background-color: ${playerColors[PlayerColor.BLUE]};
+          background: linear-gradient(135deg, ${playerColors[PlayerColor.BLUE].light} 0%, ${playerColors[PlayerColor.BLUE].main} 50%, ${playerColors[PlayerColor.BLUE].dark} 100%);
           transform: rotate(180deg);
+          box-shadow: inset 0 -2px 4px rgba(0, 0, 0, 0.3);
         }
 
         .center-triangle.yellow-bg {
-          background-color: ${playerColors[PlayerColor.YELLOW]};
+          background: linear-gradient(135deg, ${playerColors[PlayerColor.YELLOW].light} 0%, ${playerColors[PlayerColor.YELLOW].main} 50%, ${playerColors[PlayerColor.YELLOW].dark} 100%);
           transform: rotate(90deg);
+          box-shadow: inset 0 -2px 4px rgba(0, 0, 0, 0.3);
         }
 
         .pathway {
@@ -276,12 +340,13 @@ export function GameBoard({ gameState, selectedPiece, onPieceClick, currentPlaye
         .cell {
           width: ${CELL_SIZE}px;
           height: ${CELL_SIZE}px;
-          border: 1px solid #ccc;
+          border: 1px solid #bbb;
           display: flex;
           justify-content: center;
           align-items: center;
           position: relative;
-          background: white;
+          background: linear-gradient(135deg, #ffffff 0%, #f8f8f8 100%);
+          box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
         }
 
         .cell.star::before {
@@ -293,42 +358,62 @@ export function GameBoard({ gameState, selectedPiece, onPieceClick, currentPlaye
 
         .cell.green-entry,
         .cell.green-path {
-          background-color: ${playerColors[PlayerColor.GREEN]};
+          background: linear-gradient(135deg, ${playerColors[PlayerColor.GREEN].light} 0%, ${playerColors[PlayerColor.GREEN].main} 100%);
+          border-color: ${playerColors[PlayerColor.GREEN].dark};
+          box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
         }
 
         .cell.red-entry,
         .cell.red-path {
-          background-color: ${playerColors[PlayerColor.RED]};
+          background: linear-gradient(135deg, ${playerColors[PlayerColor.RED].light} 0%, ${playerColors[PlayerColor.RED].main} 100%);
+          border-color: ${playerColors[PlayerColor.RED].dark};
+          box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
         }
 
         .cell.yellow-entry,
         .cell.yellow-path {
-          background-color: ${playerColors[PlayerColor.YELLOW]};
+          background: linear-gradient(135deg, ${playerColors[PlayerColor.YELLOW].light} 0%, ${playerColors[PlayerColor.YELLOW].main} 100%);
+          border-color: ${playerColors[PlayerColor.YELLOW].dark};
+          box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
         }
 
         .cell.blue-entry,
         .cell.blue-path {
-          background-color: ${playerColors[PlayerColor.BLUE]};
+          background: linear-gradient(135deg, ${playerColors[PlayerColor.BLUE].light} 0%, ${playerColors[PlayerColor.BLUE].main} 100%);
+          border-color: ${playerColors[PlayerColor.BLUE].dark};
+          box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
         }
 
         .cell.green-start {
-          background-color: ${playerColors[PlayerColor.GREEN]};
-          border: 2px solid #555;
+          background: linear-gradient(135deg, ${playerColors[PlayerColor.GREEN].light} 0%, ${playerColors[PlayerColor.GREEN].main} 50%, ${playerColors[PlayerColor.GREEN].dark} 100%);
+          border: 3px solid ${playerColors[PlayerColor.GREEN].dark};
+          box-shadow: 
+            inset 0 2px 4px rgba(0, 0, 0, 0.3),
+            0 2px 4px rgba(0, 0, 0, 0.2);
         }
 
         .cell.red-start {
-          background-color: ${playerColors[PlayerColor.RED]};
-          border: 2px solid #555;
+          background: linear-gradient(135deg, ${playerColors[PlayerColor.RED].light} 0%, ${playerColors[PlayerColor.RED].main} 50%, ${playerColors[PlayerColor.RED].dark} 100%);
+          border: 3px solid ${playerColors[PlayerColor.RED].dark};
+          box-shadow: 
+            inset 0 2px 4px rgba(0, 0, 0, 0.3),
+            0 2px 4px rgba(0, 0, 0, 0.2);
         }
 
         .cell.blue-start {
-          background-color: ${playerColors[PlayerColor.BLUE]};
-          border: 2px solid #555;
+          background: linear-gradient(135deg, ${playerColors[PlayerColor.BLUE].light} 0%, ${playerColors[PlayerColor.BLUE].main} 50%, ${playerColors[PlayerColor.BLUE].dark} 100%);
+          border: 3px solid ${playerColors[PlayerColor.BLUE].dark};
+          box-shadow: 
+            inset 0 2px 4px rgba(0, 0, 0, 0.3),
+            0 2px 4px rgba(0, 0, 0, 0.2);
         }
 
         .cell.yellow-start {
-          background-color: ${playerColors[PlayerColor.YELLOW]};
-          border: 2px solid #555;
+          background: linear-gradient(135deg, ${playerColors[PlayerColor.YELLOW].light} 0%, ${playerColors[PlayerColor.YELLOW].main} 50%, ${playerColors[PlayerColor.YELLOW].dark} 100%);
+          border: 3px solid ${playerColors[PlayerColor.YELLOW].dark};
+          box-shadow: 
+            inset 0 2px 4px rgba(0, 0, 0, 0.3),
+            0 2px 4px rgba(0, 0, 0, 0.2);
         }
 
         .arrow-down::after,
@@ -367,56 +452,86 @@ export function GameBoard({ gameState, selectedPiece, onPieceClick, currentPlaye
         }
 
         .track-piece {
-          width: 25px;
-          height: 25px;
-          background-color: #e0e0e0;
+          width: 28px;
+          height: 28px;
           border-radius: 50%;
-          border: 2px solid #555;
+          border: 2.5px solid #444;
           cursor: pointer;
-          transition: transform 0.2s ease;
+          transition: all 0.2s ease;
           z-index: 10;
-          box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4);
           display: flex;
           justify-content: center;
           align-items: center;
           margin: auto;
           position: relative;
+          box-shadow: 
+            0 3px 8px rgba(0, 0, 0, 0.5),
+            inset 0 -2px 4px rgba(0, 0, 0, 0.3),
+            inset 0 2px 3px rgba(255, 255, 255, 0.4);
+        }
+
+        .track-piece.red-token {
+          background: radial-gradient(circle at 30% 30%, #ff6b6b 0%, ${playerColors[PlayerColor.RED].main} 40%, ${playerColors[PlayerColor.RED].dark} 100%);
+        }
+
+        .track-piece.green-token {
+          background: radial-gradient(circle at 30% 30%, #81c784 0%, ${playerColors[PlayerColor.GREEN].main} 40%, ${playerColors[PlayerColor.GREEN].dark} 100%);
+        }
+
+        .track-piece.blue-token {
+          background: radial-gradient(circle at 30% 30%, #64b5f6 0%, ${playerColors[PlayerColor.BLUE].main} 40%, ${playerColors[PlayerColor.BLUE].dark} 100%);
+        }
+
+        .track-piece.yellow-token {
+          background: radial-gradient(circle at 30% 30%, #ffd54f 0%, ${playerColors[PlayerColor.YELLOW].main} 40%, ${playerColors[PlayerColor.YELLOW].dark} 100%);
         }
 
         .track-piece:hover {
-          transform: scale(1.15);
+          transform: scale(1.2) translateY(-2px);
+          box-shadow: 
+            0 5px 12px rgba(0, 0, 0, 0.6),
+            inset 0 -2px 4px rgba(0, 0, 0, 0.3),
+            inset 0 2px 3px rgba(255, 255, 255, 0.4);
         }
 
         .track-piece.selected {
           border-color: #ffd700;
           border-width: 3px;
-          box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+          box-shadow: 
+            0 0 15px rgba(255, 215, 0, 0.8),
+            0 3px 8px rgba(0, 0, 0, 0.5),
+            inset 0 -2px 4px rgba(0, 0, 0, 0.3),
+            inset 0 2px 3px rgba(255, 255, 255, 0.4);
+          transform: scale(1.15);
         }
 
         .track-piece::before {
           content: '';
           position: absolute;
-          width: 10px;
-          height: 10px;
-          background-color: white;
+          width: 12px;
+          height: 12px;
+          background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.6) 60%, rgba(255, 255, 255, 0.3) 100%);
           border-radius: 50%;
-          border: 1px solid #555;
+          border: 1.5px solid rgba(0, 0, 0, 0.3);
+          top: 25%;
+          left: 25%;
+          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
         }
 
         .track-piece.red-token::before {
-          border-color: ${playerColors[PlayerColor.RED]};
+          border-color: ${playerColors[PlayerColor.RED].dark};
         }
 
         .track-piece.green-token::before {
-          border-color: ${playerColors[PlayerColor.GREEN]};
+          border-color: ${playerColors[PlayerColor.GREEN].dark};
         }
 
         .track-piece.blue-token::before {
-          border-color: ${playerColors[PlayerColor.BLUE]};
+          border-color: ${playerColors[PlayerColor.BLUE].dark};
         }
 
         .track-piece.yellow-token::before {
-          border-color: ${playerColors[PlayerColor.YELLOW]};
+          border-color: ${playerColors[PlayerColor.YELLOW].dark};
         }
       `}</style>
 
