@@ -1,59 +1,50 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { getSocket } from '@/lib/socket';
-import { WebRTCManager } from '@/lib/webrtc';
+import { useSocket } from '@/lib/hooks/useSocket';
+import { VideoChat } from '@/components/VideoChat';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-
-interface Player {
-  userId: string;
-  socketId: string;
-  username: string;
-  color?: string;
-  isReady: boolean;
-}
-
-interface Room {
-  code: string;
-  hostId: string;
-  players: Player[];
-  maxPlayers: number;
-  status: string;
-  gameId?: string;
-}
+import { Room } from '@/types/socket';
 
 export default function RoomPage() {
   const router = useRouter();
   const params = useParams();
   const roomCode = params.code as string;
   
+  const { socket, isConnected } = useSocket('room');
   const [room, setRoom] = useState<Room | null>(null);
   const [isReady, setIsReady] = useState(false);
-  const [webrtcManager, setWebrtcManager] = useState<WebRTCManager | null>(null);
-  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
-  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
-  const [videoEnabled, setVideoEnabled] = useState(true);
-  const [audioEnabled, setAudioEnabled] = useState(true);
-  const localVideoRef = useRef<HTMLVideoElement>(null);
-  const remoteVideoRef = useRef<HTMLVideoElement>(null);
-  const socketRef = useRef<any>(null);
-  const webrtcManagerRef = useRef<WebRTCManager | null>(null);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      router.push('/');
-      return;
-    }
+    if (!socket || !isConnected) return;
 
-    const socket = getSocket(token);
-    socketRef.current = socket;
-
+    // Join room
     socket.emit('join-room', { roomCode });
 
+    // Event listeners
     socket.on('room-joined', (data: { room: Room }) => {
+      setRoom(data.room);
+      setError(null);
+    });
+
+    socket.on('player-joined', (data: { userId: string; username: string; room: Room; message: string }) => {
+      setRoom(data.room);
+      console.log(`${data.username} joined`);
+    });
+
+    socket.on('player-left', (data: { userId: string; username: string; room: Room }) => {
+      setRoom(data.room);
+    });
+
+    socket.on('player-disconnected', (data: { userId: string; username: string; room: Room }) => {
+      setRoom(data.room);
+    });
+
+    socket.on('player-ready-updated', (data: { room: Room }) => {
       setRoom(data.room);
     });
 
@@ -61,77 +52,55 @@ export default function RoomPage() {
       setRoom(data.room);
     });
 
-    socket.on('game-started', (data: { gameId: string; gameState: any; room: Room }) => {
-      router.push(`/game/${data.gameId}`);
+    socket.on('countdown-started', (data: { countdown: number; roomCode: string }) => {
+      setCountdown(data.countdown);
+    });
+
+    socket.on('countdown-update', (data: { countdown: number; roomCode: string }) => {
+      setCountdown(data.countdown);
+    });
+
+    socket.on('game-start', (data: { gameId: string; gameState: any; room: Room }) => {
+      // Redirect to game page
+      router.push(`/game/${data.gameId}?roomCode=${roomCode}`);
+    });
+
+    socket.on('room-full', (data: { message: string }) => {
+      setError(data.message);
+      // Show toast or alert
+      alert(data.message);
     });
 
     socket.on('error', (data: { message: string }) => {
+      setError(data.message);
       console.error('Socket error:', data.message);
-    });
-
-    // Initialize WebRTC
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
-    const manager = new WebRTCManager(user.id, socket, roomCode);
-    webrtcManagerRef.current = manager;
-    setWebrtcManager(manager);
-
-    manager.setOnRemoteStream((userId, stream) => {
-      setRemoteStream(stream);
-    });
-
-    manager.startLocalStream(videoEnabled, audioEnabled).then((stream) => {
-      setLocalStream(stream);
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
-      }
-      // Create offer after a short delay
-      setTimeout(() => {
-        manager.createOffer();
-      }, 1000);
     });
 
     return () => {
       socket.off('room-joined');
+      socket.off('player-joined');
+      socket.off('player-left');
+      socket.off('player-disconnected');
+      socket.off('player-ready-updated');
       socket.off('room-updated');
-      socket.off('game-started');
+      socket.off('countdown-started');
+      socket.off('countdown-update');
+      socket.off('game-start');
+      socket.off('room-full');
       socket.off('error');
-      manager.close();
     };
-  }, [roomCode, router, videoEnabled, audioEnabled]);
-
-  useEffect(() => {
-    if (remoteStream && remoteVideoRef.current) {
-      remoteVideoRef.current.srcObject = remoteStream;
-    }
-  }, [remoteStream]);
+  }, [socket, isConnected, roomCode, router]);
 
   const handleReady = () => {
-    if (socketRef.current) {
-      socketRef.current.emit('player-ready', { roomCode });
+    if (socket && roomCode) {
+      socket.emit('player-ready', { roomCode });
       setIsReady(true);
     }
   };
 
-  const handleToggleVideo = () => {
-    if (webrtcManagerRef.current) {
-      webrtcManagerRef.current.toggleVideo();
-      setVideoEnabled(!videoEnabled);
-    }
-  };
-
-  const handleToggleAudio = () => {
-    if (webrtcManagerRef.current) {
-      webrtcManagerRef.current.toggleAudio();
-      setAudioEnabled(!audioEnabled);
-    }
-  };
-
   const handleLeave = () => {
-    if (socketRef.current) {
-      socketRef.current.emit('leave-room', { roomCode });
-    }
-    if (webrtcManagerRef.current) {
-      webrtcManagerRef.current.close();
+    if (socket && roomCode) {
+      socket.emit('leave-room', { roomCode });
     }
     router.push('/lobby');
   };
@@ -146,6 +115,8 @@ export default function RoomPage() {
 
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
   const currentPlayer = room.players.find(p => p.userId === currentUser.id);
+  const connectedPlayers = room.players.filter(p => p.socketId && p.socketId !== '');
+  const readyPlayers = room.players.filter(p => p.isReady);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-100 p-4">
@@ -161,40 +132,117 @@ export default function RoomPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
-                  {room.players.map((player) => (
-                    <div
-                      key={player.userId}
-                      className="flex items-center justify-between p-3 border rounded-lg"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{player.username}</span>
-                        {player.color && (
-                          <span
-                            className="px-2 py-1 text-xs rounded"
-                            style={{
-                              backgroundColor: player.color.toLowerCase(),
-                              color: 'white',
-                            }}
-                          >
-                            {player.color}
-                          </span>
-                        )}
-                      </div>
-                      <div>
-                        {player.isReady ? (
-                          <span className="text-green-600">✓ Ready</span>
-                        ) : (
-                          <span className="text-gray-400">Not ready</span>
-                        )}
-                      </div>
+                {/* Countdown Display */}
+                {countdown !== null && countdown > 0 && (
+                  <div className="mb-4 p-4 bg-yellow-50 border-2 border-yellow-400 rounded-lg text-center">
+                    <div className="text-4xl font-bold text-yellow-600 mb-2">
+                      {countdown}
                     </div>
-                  ))}
+                    <div className="text-sm text-yellow-700">
+                      Game starting in {countdown} second{countdown !== 1 ? 's' : ''}...
+                    </div>
+                  </div>
+                )}
+
+                {/* Status */}
+                <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+                  <div className="text-sm font-medium text-blue-900">
+                    👥 Players in Room: {room.players.length}/{room.maxPlayers}
+                  </div>
+                  <div className="text-xs text-blue-700 mt-1">
+                    🟢 Connected: {connectedPlayers.length} | 
+                    ✅ Ready: {readyPlayers.length}
+                  </div>
+                  {room.players.length >= 2 && readyPlayers.length === connectedPlayers.length && connectedPlayers.length >= 2 && !countdown && (
+                    <div className="text-sm font-semibold text-green-600 mt-2">
+                      🎮 All players ready! Starting game in 5 seconds...
+                    </div>
+                  )}
+                  {room.players.length < 2 && (
+                    <div className="text-xs text-orange-600 mt-1">
+                      ⏳ Waiting for {2 - room.players.length} more player(s)...
+                    </div>
+                  )}
                 </div>
 
+                {/* Error Message */}
+                {error && (
+                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-sm text-red-600">{error}</p>
+                  </div>
+                )}
+
+                {/* Players List */}
+                <div className="space-y-2">
+                  <h4 className="font-semibold text-sm mb-2">Connected Users:</h4>
+                  {room.players.length === 0 ? (
+                    <div className="text-center text-gray-400 py-4">
+                      No players yet. Waiting for players to join...
+                    </div>
+                  ) : (
+                    room.players.map((player) => {
+                      const isConnected = player.socketId && player.socketId !== '';
+                      const isCurrentUser = player.userId === currentUser.id;
+                      return (
+                        <div
+                          key={player.userId}
+                          className={`flex items-center justify-between p-3 border-2 rounded-lg ${
+                            isConnected 
+                              ? isCurrentUser
+                                ? 'bg-blue-100 border-blue-400'
+                                : 'bg-green-50 border-green-300'
+                              : 'bg-gray-50 border-gray-300 opacity-60'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={`w-4 h-4 rounded-full ${
+                              isConnected ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
+                            }`} title={isConnected ? 'Online' : 'Offline'}></div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium">{player.username}</span>
+                                {isCurrentUser && (
+                                  <span className="text-xs bg-blue-500 text-white px-2 py-0.5 rounded font-semibold">
+                                    You
+                                  </span>
+                                )}
+                                {player.color && (
+                                  <span
+                                    className="px-2 py-1 text-xs rounded text-white font-semibold"
+                                    style={{
+                                      backgroundColor: player.color.toLowerCase(),
+                                    }}
+                                  >
+                                    {player.color}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-xs text-gray-500 mt-0.5">
+                                {isConnected ? '🟢 Online & Connected' : '🔴 Offline'}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex flex-col items-end gap-1">
+                            {player.isReady ? (
+                              <span className="text-green-600 font-semibold flex items-center gap-1">
+                                <span>✓</span> Ready
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">⏳ Not ready</span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* Actions */}
                 <div className="mt-4 space-x-2">
                   {!currentPlayer?.isReady && (
-                    <Button onClick={handleReady}>I'm Ready</Button>
+                    <Button onClick={handleReady} disabled={!isConnected}>
+                      I'm Ready
+                    </Button>
                   )}
                   <Button onClick={handleLeave} variant="outline">
                     Leave Room
@@ -206,50 +254,7 @@ export default function RoomPage() {
 
           {/* Video/Audio Section */}
           <div className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Video & Audio</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium">Your Video</label>
-                  <video
-                    ref={localVideoRef}
-                    autoPlay
-                    muted
-                    playsInline
-                    className="w-full rounded-lg border mt-2"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium">Remote Video</label>
-                  <video
-                    ref={remoteVideoRef}
-                    autoPlay
-                    playsInline
-                    className="w-full rounded-lg border mt-2"
-                  />
-                </div>
-
-                <div className="flex gap-2">
-                  <Button
-                    onClick={handleToggleVideo}
-                    variant={videoEnabled ? 'default' : 'secondary'}
-                    size="sm"
-                  >
-                    {videoEnabled ? '🔴 Video On' : '⚫ Video Off'}
-                  </Button>
-                  <Button
-                    onClick={handleToggleAudio}
-                    variant={audioEnabled ? 'default' : 'secondary'}
-                    size="sm"
-                  >
-                    {audioEnabled ? '🔊 Audio On' : '🔇 Audio Off'}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+            <VideoChat socket={socket} roomCode={roomCode} enabled={isConnected} />
           </div>
         </div>
       </div>
