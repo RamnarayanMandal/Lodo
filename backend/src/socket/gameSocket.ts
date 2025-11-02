@@ -197,7 +197,7 @@ export function setupGameSocket(gameNamespace: Namespace) {
         );
 
         if (targetPosition === -1) {
-          socket.emit('error', { message: 'Invalid move' });
+          socket.emit('error', { message: 'Invalid move: goti out of board.' });
           return;
         }
 

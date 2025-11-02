@@ -1,13 +1,17 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { PlayerColor, GameState } from '@/types/socket';
+import { positionToGrid, isSafePosition, isHomeStretch, calculateIntermediatePositions } from '@/lib/utils/positionCalculator';
 
 interface GameBoardProps {
   gameState: GameState | null;
   selectedPiece: number | null;
   onPieceClick: (pieceId: number) => void;
   currentPlayerColor?: PlayerColor;
+  movingPiece?: { pieceId: number; fromPosition: number; toPosition: number; diceValue: number; color: PlayerColor } | null;
+  isAnimating?: boolean;
 }
 
 // CSS Variables and colors matching the reference
@@ -63,41 +67,79 @@ const homeStretchStarts: Record<PlayerColor, number> = {
 };
 
 
-export function GameBoard({ gameState, selectedPiece, onPieceClick, currentPlayerColor }: GameBoardProps) {
+export function GameBoard({ gameState, selectedPiece, onPieceClick, currentPlayerColor, movingPiece, isAnimating = false }: GameBoardProps) {
   if (!gameState) return null;
 
-  // Map piece position to CSS Grid coordinates
+  // Map piece position to CSS Grid coordinates using position calculator
   const getPieceGridPosition = (position: number, color: PlayerColor): { gridRow: number; gridColumn: number } | null => {
-    if (position < 0) return null; // Piece in home
-    
-    // Home stretch paths (positions 52+)
-    if (position >= 52) {
-      const homeStretchIndex = position - 52;
-      const colorIndex = Object.values(PlayerColor).indexOf(color);
-      const stretchStart = colorIndex * 6;
-      
-      if (homeStretchIndex >= stretchStart && homeStretchIndex < stretchStart + 6) {
-        const indexInStretch = homeStretchIndex - stretchStart;
-        // Map to center home paths
-        switch (color) {
-          case PlayerColor.RED:
-            return { gridRow: 7 + indexInStretch, gridColumn: 7 };
-          case PlayerColor.BLUE:
-            return { gridRow: 8, gridColumn: 7 + indexInStretch };
-          case PlayerColor.GREEN:
-            return { gridRow: 10 - indexInStretch, gridColumn: 9 };
-          case PlayerColor.YELLOW:
-            return { gridRow: 9, gridColumn: 10 - indexInStretch };
-        }
-      }
-      return null;
-    }
-    
-    // Outer track (positions 0-51) - simplified mapping
-    // This is a complex calculation that maps the circular track to grid cells
-    // For now, return center position - full implementation would calculate exact grid cells
-    return null;
+    const gridPos = positionToGrid(position, color);
+    if (!gridPos) return null;
+    return { gridRow: gridPos.row, gridColumn: gridPos.col };
   };
+
+  // Track animation state for moving pieces
+  const [animatingPieces, setAnimatingPieces] = useState<Map<string, { currentPos: number; positions: number[] }>>(new Map());
+
+  useEffect(() => {
+    if (movingPiece) {
+      const key = `${movingPiece.color}-${movingPiece.pieceId}`;
+      const positions = calculateIntermediatePositions(
+        movingPiece.fromPosition,
+        movingPiece.toPosition,
+        movingPiece.color,
+        movingPiece.diceValue
+      );
+
+      setAnimatingPieces(prev => {
+        const newMap = new Map(prev);
+        newMap.set(key, { currentPos: movingPiece.fromPosition, positions });
+        return newMap;
+      });
+
+      // Animate through positions step-by-step
+      let stepIndex = 0;
+      const animateStep = () => {
+        if (stepIndex < positions.length) {
+          setAnimatingPieces(prev => {
+            const newMap = new Map(prev);
+            const current = newMap.get(key);
+            if (current) {
+              // Update to next position in sequence
+              current.currentPos = positions[stepIndex];
+              newMap.set(key, current);
+            }
+            return newMap;
+          });
+          stepIndex++;
+          // Continue animation to next step (150ms per cell)
+          setTimeout(animateStep, 150);
+        } else {
+          // All steps completed, finalize position
+          setAnimatingPieces(prev => {
+            const newMap = new Map(prev);
+            const current = newMap.get(key);
+            if (current) {
+              // Ensure final position is set
+              current.currentPos = movingPiece.toPosition;
+              newMap.set(key, current);
+            }
+            return newMap;
+          });
+          
+          // Clean up after a brief delay
+          setTimeout(() => {
+            setAnimatingPieces(prev => {
+              const newMap = new Map(prev);
+              newMap.delete(key);
+              return newMap;
+            });
+          }, 200);
+        }
+      };
+      // Start animation after brief delay
+      setTimeout(animateStep, 100);
+    }
+  }, [movingPiece]);
 
   // Get pieces in home area for a color
   const getHomePieces = (color: PlayerColor) => {
@@ -130,7 +172,7 @@ export function GameBoard({ gameState, selectedPiece, onPieceClick, currentPlaye
           height: ${BOARD_SIZE}px;
           border: 4px solid #1a1a1a;
           border-radius: 12px;
-          overflow: hidden;
+          overflow: visible;
           box-shadow: 
             0 8px 20px rgba(0, 0, 0, 0.4),
             inset 0 1px 0 rgba(255, 255, 255, 0.1);
@@ -672,24 +714,133 @@ export function GameBoard({ gameState, selectedPiece, onPieceClick, currentPlaye
           </div>
         </div>
 
-        {/* Pieces on track - positioned using CSS Grid */}
+        {/* Pieces on track - positioned using Framer Motion for smooth animation */}
         {getTrackPieces().map(({ piece, player, position }) => {
-          const gridPos = getPieceGridPosition(position, player.color as PlayerColor);
-          if (!gridPos) return null;
+          const pieceKey = `${player.color}-${piece.id}`;
+          const animatingState = animatingPieces.get(pieceKey);
+          // Use animated position if moving, otherwise use actual position
+          const currentPos = animatingState !== undefined ? animatingState.currentPos : position;
+          
+          const gridPos = positionToGrid(currentPos, player.color as PlayerColor);
+          if (!gridPos) {
+            // If position is invalid or out of bounds, don't render
+            return null;
+          }
 
           const isSelected = selectedPiece === piece.id && currentPlayerColor === player.color;
+          const isMoving = animatingState !== undefined;
+          const isSafe = isSafePosition(currentPos, player.color as PlayerColor);
+          const isInHome = isHomeStretch(currentPos, player.color as PlayerColor);
           const colorClass = `${player.color.toLowerCase()}-token`;
 
+          const getColorGradient = () => {
+            const gradients = {
+              [PlayerColor.RED]: 'radial-gradient(circle at 30% 30%, #ff6b6b 0%, #E53935 40%, #C62828 100%)',
+              [PlayerColor.GREEN]: 'radial-gradient(circle at 30% 30%, #81c784 0%, #4CAF50 40%, #388E3C 100%)',
+              [PlayerColor.BLUE]: 'radial-gradient(circle at 30% 30%, #64b5f6 0%, #2196F3 40%, #1976D2 100%)',
+              [PlayerColor.YELLOW]: 'radial-gradient(circle at 30% 30%, #ffd54f 0%, #FFC107 40%, #F9A825 100%)',
+            };
+            return gradients[player.color as PlayerColor] || '';
+          };
+
           return (
-            <div
+            <motion.div
               key={`track-piece-${player.userId}-${piece.id}`}
-              className={`track-piece ${colorClass} ${isSelected ? 'selected' : ''}`}
-              onClick={() => onPieceClick(piece.id)}
+              className={`track-piece ${colorClass} ${isSelected ? 'selected' : ''} ${isMoving ? 'moving' : ''}`}
+              onClick={() => !isAnimating && onPieceClick(piece.id)}
               style={{
-                gridRow: gridPos.gridRow,
-                gridColumn: gridPos.gridColumn,
+                position: 'absolute',
+                left: 0,
+                top: 0,
+                width: `${CELL_SIZE * 0.7}px`,
+                height: `${CELL_SIZE * 0.7}px`,
+                borderRadius: '50%',
+                background: getColorGradient(),
+                border: isSelected ? '3px solid #ffd700' : '2.5px solid #444',
+                cursor: isAnimating || isMoving ? 'wait' : 'pointer',
+                pointerEvents: isAnimating || isMoving ? 'none' : 'auto',
+                zIndex: isMoving ? 100 : 10,
+                boxShadow: isMoving
+                  ? '0 0 20px rgba(255, 215, 0, 0.8), 0 5px 12px rgba(0, 0, 0, 0.6)'
+                  : isSelected
+                  ? '0 0 15px rgba(255, 215, 0, 0.8), 0 3px 8px rgba(0, 0, 0, 0.5)'
+                  : '0 3px 8px rgba(0, 0, 0, 0.5)',
               }}
-            />
+              animate={{
+                x: gridPos.x - (CELL_SIZE * 0.7) / 2,
+                y: gridPos.y - (CELL_SIZE * 0.7) / 2,
+                scale: isMoving ? 1.3 : isSelected ? 1.15 : 1,
+                rotate: isMoving ? [0, 5, -5, 0] : 0,
+              }}
+              transition={{
+                duration: isMoving ? 0.15 : 0.3,
+                ease: 'easeInOut',
+                type: 'tween',
+                stiffness: 300,
+                damping: 30,
+              }}
+              whileHover={{
+                scale: 1.2,
+                transition: { duration: 0.2 },
+              }}
+            >
+              {/* Glow effect for safe zones */}
+              {isSafe && (
+                <motion.div
+                  className="absolute inset-0 rounded-full"
+                  style={{
+                    background: 'radial-gradient(circle, rgba(255, 255, 0, 0.5) 0%, transparent 70%)',
+                    filter: 'blur(8px)',
+                    zIndex: -1,
+                  }}
+                  animate={{
+                    opacity: [0.5, 1, 0.5],
+                    scale: [1, 1.2, 1],
+                  }}
+                  transition={{
+                    duration: 2,
+                    repeat: Infinity,
+                    ease: 'easeInOut',
+                  }}
+                />
+              )}
+
+              {/* Glow effect for home */}
+              {isInHome && (
+                <motion.div
+                  className="absolute inset-0 rounded-full"
+                  style={{
+                    background: getColorGradient(),
+                    filter: 'blur(12px)',
+                    zIndex: -1,
+                    opacity: 0.7,
+                  }}
+                  animate={{
+                    opacity: [0.6, 1, 0.6],
+                    scale: [1, 1.5, 1],
+                  }}
+                  transition={{
+                    duration: 1.5,
+                    repeat: Infinity,
+                    ease: 'easeInOut',
+                  }}
+                />
+              )}
+
+              {/* Highlight dot */}
+              <div
+                className="absolute"
+                style={{
+                  width: '40%',
+                  height: '40%',
+                  top: '25%',
+                  left: '25%',
+                  background: 'radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.6) 60%, rgba(255, 255, 255, 0.3) 100%)',
+                  borderRadius: '50%',
+                  border: '1.5px solid rgba(0, 0, 0, 0.3)',
+                }}
+              />
+            </motion.div>
           );
         })}
       </div>
